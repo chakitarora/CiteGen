@@ -3,7 +3,8 @@
 **Paste a list of PubMed IDs. Get formatted citations in 9 styles. Export files your reference manager can open immediately.**
 
 No account. No install. No data leaves your browser. One HTML file.
-A free PubMed API key is recommended. See below on how to obtain one.
+
+## A free PubMed API key is recommended. See below on how to obtain one.
 ---
 
 ## What this is
