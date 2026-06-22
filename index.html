@@ -910,8 +910,21 @@ class RateLimiter{constructor(rps){this.d=1000/rps;this.t=0;}async wait(){const 
 async function fetchPaper(pmid,lim){
   await lim.wait();
   const k=apiKey?`&api_key=${apiKey}`:'';
-  try{const r=await fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&rettype=xml&retmode=xml${k}`);if(!r.ok)return null;return parseXML(await r.text(),pmid);}
-  catch(e){return null;}
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),12000);
+  try{
+    const r=await fetch(
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&rettype=xml&retmode=xml&tool=citegen&email=citegen@tool.com${k}`,
+      {signal:controller.signal}
+    );
+    clearTimeout(timeout);
+    if(!r.ok)return null;
+    const txt=await r.text();
+    return parseXML(txt,pmid);
+  }catch(e){
+    clearTimeout(timeout);
+    return null;
+  }
 }
 
 function parseXML(xml,pmid){
@@ -982,7 +995,6 @@ async function runFetch(){
   document.getElementById('run-btn').disabled=true;
   document.getElementById('empty-state').style.display='none';
   document.getElementById('results-section').style.display='block';
-  document.getElementById('cards-wrap').innerHTML='';
   document.getElementById('progress-section').style.display='block';
   papers=[];
   document.getElementById('chip-grid').innerHTML=valid.map(id=>`<div class="pmid-chip loading" id="chip-${id}">${id}</div>`).join('');
@@ -1001,8 +1013,8 @@ async function runFetch(){
     setStatus(`${done} / ${valid.length} fetched…`,'');
   }));
   papers.sort((a,b)=>valid.indexOf(a.pmid)-valid.indexOf(b.pmid));
-  renderTable();
   document.getElementById('progress-section').style.display='none';
+  renderTable();
   document.getElementById('results-count').textContent=`${papers.length} paper${papers.length!==1?'s':''}`;
   document.getElementById('results-sub').textContent=`${invalid.length?invalid.length+' invalid IDs skipped · ':''}click any entry to expand all formats`;
   setStatus(`✓ ${papers.length} citations ready`,'ok');
