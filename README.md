@@ -3,7 +3,7 @@
 **Paste a list of PubMed IDs. Get formatted citations in 9 styles. Export files your reference manager can open immediately.**
 
 No account. No install. No data leaves your browser. One HTML file.
-
+A free PubMed API key is recommended. See below on how to obtain one.
 ---
 
 ## What this is
@@ -155,7 +155,7 @@ The `.ris` or `.xml` import from CiteGen gives you fully tagged entries so Mende
 
 ---
 
-## Getting an NCBI API key (optional)
+## Getting an NCBI API key (highly recommended!)
 
 Without a key, NCBI allows 3 requests/second. With a free key, this increases to 10 requests/second — roughly 3× faster for large batches.
 
