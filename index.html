@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CiteGen — PMID Citation Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --paper:     #f7f2e8;
+  --paper2:    #f0e9d8;
+  --paper3:    #e8dfca;
+  --ink:       #1a1208;
+  --ink2:      #2e2416;
+  --ink3:      #4a3c28;
+  --faint:     #c8b89a;
+  --faint2:    #b8a488;
+  --blue:      #2c3e6b;
+  --blue2:     #1e2d52;
+  --blue-pale: rgba(44,62,107,0.08);
+  --rust:      #8b3a2a;
+  --rust-pale: rgba(139,58,42,0.07);
+  --muted:     #7a6a52;
+  --dim:       #a8987c;
+  --mono: 'IBM Plex Mono', monospace;
+  --serif: 'Lora', serif;
+}
+body{
+  font-family:var(--serif);
+  background:var(--paper);
+  color:var(--ink);
+  min-height:100vh;
+  font-size:14px;
+}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--paper2)}
+::-webkit-scrollbar-thumb{background:var(--faint);border-radius:0}
+::selection{background:rgba(44,62,107,0.15)}
+
+/* ══════════════════════════════════
+   HEADER
+══════════════════════════════════ */
+.site-header{
+  background:var(--ink);
+  color:var(--paper);
+  padding:0 36px;
+  height:62px;
+  display:flex;
+  align-items:center;
+  gap:28px;
+  position:sticky;top:0;z-index:200;
+  border-bottom:3px solid var(--blue);
+}
+.logo-wrap{display:flex;align-items:baseline;gap:12px}
+.logo-mark{
+  font-family:var(--serif);font-style:italic;
+  font-size:1.7rem;font-weight:400;
+  color:var(--paper);opacity:0.9;
+  letter-spacing:-0.02em;line-height:1;
+}
+.logo-name{
+  font-family:var(--mono);font-size:1rem;font-weight:600;
+  color:var(--paper);letter-spacing:0.12em;
+  text-transform:uppercase;
+}
+.logo-rule{
+  flex:1;height:1px;
+  background:linear-gradient(to right,rgba(247,242,232,0.15),transparent);
+}
+.logo-caption{
+  font-family:var(--mono);font-size:0.62rem;
+  color:rgba(247,242,232,0.35);letter-spacing:0.08em;
+  text-align:right;line-height:1.7;
+}
+
+/* ══════════════════════════════════
+   LAYOUT
+══════════════════════════════════ */
+.app-layout{
+  display:grid;
+  grid-template-columns:320px 1fr;
+  min-height:calc(100vh - 62px);
+}
+.sidebar{
+  background:var(--paper2);
+  border-right:1px solid var(--faint);
+  overflow-y:auto;
+  display:flex;flex-direction:column;
+}
+.results-pane{
+  background:var(--paper);
+  padding:32px 36px;
+  overflow-y:auto;
+}
+
+/* ══════════════════════════════════
+   SIDEBAR
+══════════════════════════════════ */
+.sb-section{
+  padding:20px 20px 16px;
+  border-bottom:1px solid var(--faint);
+}
+.sb-section:last-child{border-bottom:none}
+.sb-label{
+  font-family:var(--mono);font-size:0.6rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--muted);
+  margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.sb-label::after{content:'';flex:1;height:1px;background:var(--faint)}
+
+textarea#pmid-input{
+  width:100%;height:120px;
+  font-family:var(--mono);font-size:0.76rem;line-height:1.9;
+  background:var(--paper);
+  border:1px solid var(--faint);
+  padding:10px 12px;color:var(--ink);
+  outline:none;resize:vertical;
+  transition:border-color 0.15s;
+  font-style:normal;
+}
+textarea#pmid-input:focus{border-color:var(--blue)}
+textarea#pmid-input::placeholder{color:var(--dim);font-style:italic}
+
+.input-foot{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:6px;
+}
+.foot-hint{font-family:var(--mono);font-size:0.62rem;color:var(--dim)}
+.ink-link{
+  font-family:var(--mono);font-size:0.62rem;color:var(--blue);
+  cursor:pointer;text-decoration:underline;transition:color 0.15s;
+}
+.ink-link:hover{color:var(--blue2)}
+
+/* upload */
+.upload-zone{
+  border:1px dashed var(--faint2);
+  padding:12px;text-align:center;
+  cursor:pointer;position:relative;
+  background:var(--paper);
+  transition:all 0.15s;
+}
+.upload-zone.dragover{border-color:var(--blue);background:var(--blue-pale)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-main{font-family:var(--mono);font-size:0.72rem;color:var(--muted)}
+.upload-sub{font-family:var(--mono);font-size:0.62rem;color:var(--dim);margin-top:2px}
+
+/* format pills */
+.fmt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.fmt-pill{
+  font-family:var(--mono);font-size:0.65rem;font-weight:500;
+  padding:6px 4px;text-align:center;
+  border:1px solid var(--faint);
+  background:var(--paper);color:var(--muted);
+  cursor:pointer;transition:all 0.12s;
+  letter-spacing:0.02em;
+}
+.fmt-pill:hover{border-color:var(--faint2);color:var(--ink3)}
+.fmt-pill.active{background:var(--blue);color:var(--paper);border-color:var(--blue);font-weight:600}
+
+/* api key */
+.api-row{display:flex;gap:5px}
+input.api-inp{
+  font-family:var(--mono);font-size:0.72rem;
+  background:var(--paper);border:1px solid var(--faint);
+  padding:7px 10px;color:var(--ink);
+  outline:none;flex:1;transition:border-color 0.15s;
+}
+input.api-inp:focus{border-color:var(--blue)}
+input.api-inp::placeholder{color:var(--dim);font-style:italic}
+.api-save{
+  font-family:var(--mono);font-size:0.65rem;
+  padding:0 10px;border:1px solid var(--faint);
+  background:var(--paper2);color:var(--muted);
+  cursor:pointer;transition:all 0.15s;white-space:nowrap;
+}
+.api-save:hover{border-color:var(--blue);color:var(--blue)}
+
+/* run */
+.run-btn{
+  width:100%;padding:11px;
+  font-family:var(--mono);font-size:0.82rem;font-weight:600;
+  letter-spacing:0.1em;text-transform:uppercase;
+  background:var(--blue);color:var(--paper);
+  border:none;cursor:pointer;
+  transition:background 0.15s;
+}
+.run-btn:hover{background:var(--blue2)}
+.run-btn:disabled{background:var(--faint);color:var(--dim);cursor:not-allowed}
+
+/* status */
+.status{
+  font-family:var(--mono);font-size:0.66rem;
+  color:var(--dim);padding:5px 0;min-height:20px;
+  font-style:italic;
+}
+.status.ok{color:#3a6b3a;font-style:normal}
+.status.err{color:var(--rust);font-style:normal}
+
+/* exports */
+.exp-list{display:flex;flex-direction:column;gap:4px}
+.exp-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;
+  border:1px solid var(--faint);
+  background:var(--paper);
+  cursor:pointer;transition:all 0.12s;
+}
+.exp-item:hover{border-color:var(--faint2);background:var(--paper2)}
+.exp-ext{
+  font-family:var(--mono);font-size:0.65rem;font-weight:600;
+  color:var(--paper);padding:2px 7px;
+  min-width:38px;text-align:center;flex-shrink:0;
+}
+.ext-bib{background:var(--blue)}
+.ext-ris{background:var(--ink3)}
+.ext-xml{background:var(--rust)}
+.ext-txt{background:var(--muted)}
+.ext-all{background:var(--ink)}
+.exp-label{font-family:var(--mono);font-size:0.72rem;color:var(--ink3)}
+.exp-sub{font-family:var(--mono);font-size:0.6rem;color:var(--dim);margin-top:1px}
+
+/* mendeley note */
+.mendeley-note{
+  background:var(--blue-pale);
+  border-left:2px solid var(--blue);
+  padding:10px 12px;
+  font-family:var(--mono);font-size:0.66rem;
+  color:var(--muted);line-height:1.7;
+}
+.mendeley-note strong{color:var(--blue);font-style:normal}
+
+/* ══════════════════════════════════
+   ABOUT + CREATOR
+══════════════════════════════════ */
+.about-block{
+  padding:18px 20px;
+  border-top:1px solid var(--faint);
+  margin-top:auto;
+}
+.about-text{
+  font-family:var(--serif);font-style:italic;
+  font-size:0.76rem;color:var(--muted);
+  line-height:1.7;margin-bottom:12px;
+}
+.creator-row{
+  display:flex;align-items:center;gap:8px;
+  padding-top:10px;
+  border-top:1px solid var(--faint);
+}
+.creator-label{font-family:var(--mono);font-size:0.6rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.1em}
+.creator-link{
+  font-family:var(--mono);font-size:0.66rem;font-weight:600;
+  color:var(--blue);text-decoration:none;transition:color 0.15s;
+}
+.creator-link:hover{color:var(--blue2)}
+
+/* ══════════════════════════════════
+   RESULTS PANE
+══════════════════════════════════ */
+.results-header{
+  display:flex;align-items:flex-end;gap:16px;
+  margin-bottom:24px;padding-bottom:14px;
+  border-bottom:2px solid var(--ink);
+}
+.results-count{
+  font-family:var(--serif);font-size:1.6rem;
+  font-weight:600;color:var(--ink);letter-spacing:-0.02em;
+}
+.results-sub{
+  font-family:var(--mono);font-size:0.66rem;
+  color:var(--muted);margin-bottom:4px;font-style:italic;
+}
+.results-actions{margin-left:auto;display:flex;gap:5px}
+.mini-btn{
+  font-family:var(--mono);font-size:0.62rem;
+  padding:4px 9px;
+  border:1px solid var(--faint);
+  background:transparent;color:var(--muted);
+  cursor:pointer;transition:all 0.12s;letter-spacing:0.04em;
+}
+.mini-btn:hover{border-color:var(--faint2);color:var(--ink3)}
+
+/* progress */
+.progress-wrap{margin-bottom:20px}
+.progress-track{height:2px;background:var(--faint);margin-bottom:8px}
+.progress-fill{height:100%;background:var(--blue);transition:width 0.25s}
+.chip-grid{display:flex;flex-wrap:wrap;gap:4px}
+.pmid-chip{
+  font-family:var(--mono);font-size:0.64rem;
+  padding:2px 8px;
+  border:1px solid var(--faint);background:var(--paper2);color:var(--muted);
+  transition:all 0.2s;
+}
+.pmid-chip.loading{border-color:var(--blue);color:var(--blue);animation:chipblink 1s infinite}
+.pmid-chip.done{border-color:#3a6b3a;color:#3a6b3a}
+.pmid-chip.error{border-color:var(--rust);color:var(--rust)}
+@keyframes chipblink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ══════════════════════════════════
+   CITATION CARD
+══════════════════════════════════ */
+.cit-card{
+  border:1px solid var(--faint);
+  margin-bottom:8px;
+  background:var(--paper);
+  transition:border-color 0.12s;
+}
+.cit-card:hover{border-color:var(--faint2)}
+
+.cit-head{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 14px 10px;cursor:pointer;
+  transition:background 0.1s;
+}
+.cit-head:hover{background:var(--paper2)}
+
+.cit-idx{
+  font-family:var(--mono);font-size:0.65rem;font-weight:600;
+  color:var(--paper);background:var(--blue);
+  padding:2px 7px;flex-shrink:0;margin-top:2px;
+  min-width:28px;text-align:center;
+}
+.cit-info{flex:1;min-width:0}
+.cit-title-text{
+  font-family:var(--serif);font-size:0.92rem;
+  font-weight:500;font-style:italic;
+  color:var(--ink);line-height:1.45;
+}
+.cit-meta-row{
+  font-family:var(--mono);font-size:0.63rem;
+  color:var(--muted);margin-top:5px;
+  display:flex;flex-wrap:wrap;gap:0;
+}
+.cit-meta-sep{color:var(--faint2);margin:0 6px}
+.cit-chevron{color:var(--faint2);font-size:0.72rem;flex-shrink:0;margin-top:3px;transition:transform 0.2s}
+.cit-card.open .cit-chevron{transform:rotate(180deg)}
+
+/* body */
+.cit-body{display:none;border-top:1px solid var(--faint)}
+.cit-card.open .cit-body{display:block}
+
+/* format tabs */
+.fmt-tabs{
+  display:flex;overflow-x:auto;
+  border-bottom:1px solid var(--faint);
+  background:var(--paper2);
+  scrollbar-width:none;gap:0;
+}
+.fmt-tabs::-webkit-scrollbar{display:none}
+.fmt-tab{
+  font-family:var(--mono);font-size:0.62rem;font-weight:500;
+  padding:7px 10px;border:none;
+  background:transparent;color:var(--muted);
+  cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px;white-space:nowrap;transition:all 0.12s;
+  letter-spacing:0.04em;
+}
+.fmt-tab:hover{color:var(--ink3)}
+.fmt-tab.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--paper)}
+
+/* citation panel */
+.cit-fmt-panel{display:none;padding:14px 14px 12px;position:relative}
+.cit-fmt-panel.visible{display:block}
+.cit-rule{
+  border-left:2px solid var(--blue);
+  padding-left:14px;margin-right:52px;
+}
+.cit-text{
+  font-family:var(--mono);font-size:0.76rem;
+  line-height:1.85;color:var(--ink2);
+  white-space:pre-wrap;word-break:break-word;
+}
+.cit-copy{
+  position:absolute;top:14px;right:14px;
+  font-family:var(--mono);font-size:0.62rem;
+  padding:3px 9px;
+  border:1px solid var(--faint2);
+  background:var(--paper2);color:var(--muted);
+  cursor:pointer;transition:all 0.12s;
+}
+.cit-copy:hover{border-color:var(--blue);color:var(--blue)}
+.cit-copy.copied{border-color:#3a6b3a;color:#3a6b3a}
+
+/* abstract */
+.cit-abstract{border-top:1px solid var(--faint);padding:10px 14px}
+.abs-toggle{
+  font-family:var(--mono);font-size:0.63rem;color:var(--muted);
+  background:none;border:none;cursor:pointer;padding:0;
+  font-style:italic;transition:color 0.12s;
+}
+.abs-toggle:hover{color:var(--blue)}
+.abs-body{
+  font-family:var(--serif);font-style:italic;
+  font-size:0.78rem;color:var(--muted);
+  line-height:1.7;margin-top:8px;display:none;
+  border-left:1px solid var(--faint2);padding-left:12px;
+}
+.abs-body.open{display:block}
+
+/* links */
+.cit-links{
+  border-top:1px solid var(--faint);padding:8px 14px;
+  display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  background:var(--paper2);
+}
+.cit-ext-link{
+  font-family:var(--mono);font-size:0.63rem;color:var(--blue);
+  text-decoration:none;transition:color 0.12s;
+}
+.cit-ext-link:hover{color:var(--blue2);text-decoration:underline}
+.pmid-pill{
+  margin-left:auto;font-family:var(--mono);font-size:0.6rem;
+  color:var(--muted);background:var(--paper);
+  border:1px solid var(--faint);
+  padding:2px 8px;cursor:pointer;transition:all 0.12s;
+}
+.pmid-pill:hover{border-color:var(--blue);color:var(--blue)}
+
+/* ══════════════════════════════════
+   EMPTY STATE
+══════════════════════════════════ */
+.empty{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:60vh;
+  text-align:center;padding:48px 32px;
+}
+.empty-mark{
+  font-family:var(--serif);font-style:italic;
+  font-size:6rem;color:var(--faint);
+  line-height:1;margin-bottom:20px;
+  font-weight:400;
+}
+.empty-title{
+  font-family:var(--serif);font-size:1.3rem;
+  font-style:italic;color:var(--muted);
+  margin-bottom:10px;
+}
+.empty-body{
+  font-family:var(--mono);font-size:0.72rem;
+  color:var(--dim);line-height:1.9;max-width:380px;
+}
+
+/* ══════════════════════════════════
+   FOOTER DISCLAIMER
+══════════════════════════════════ */
+.site-footer{
+  background:var(--ink);color:var(--paper);
+  padding:18px 36px;
+  display:flex;align-items:center;gap:24px;
+  flex-wrap:wrap;
+  border-top:2px solid var(--blue);
+}
+.footer-disclaimer{
+  font-family:var(--mono);font-size:0.62rem;
+  color:rgba(247,242,232,0.4);line-height:1.7;flex:1;
+}
+.footer-creator{
+  font-family:var(--mono);font-size:0.64rem;
+  color:rgba(247,242,232,0.5);text-align:right;line-height:1.8;
+  flex-shrink:0;
+}
+.footer-creator a{
+  color:rgba(247,242,232,0.7);text-decoration:none;
+  border-bottom:1px solid rgba(247,242,232,0.2);
+  transition:all 0.15s;
+}
+.footer-creator a:hover{color:var(--paper);border-bottom-color:var(--paper)}
+.footer-design-note{
+  width:100%;border-top:1px solid rgba(247,242,232,0.08);
+  padding-top:12px;margin-top:4px;
+  font-family:var(--serif);font-style:italic;font-size:0.68rem;
+  color:rgba(247,242,232,0.25);line-height:1.6;
+}
+
+@media(max-width:820px){
+  .app-layout{grid-template-columns:1fr;height:auto}
+  .sidebar{border-right:none;border-bottom:1px solid var(--faint);height:auto}
+  .results-pane{padding:20px}
+}
+
+/* ══════════════════════════════════
+   CITATION TABLE
+══════════════════════════════════ */
+.tbl-toolbar{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:12px;flex-wrap:wrap;
+}
+.tbl-search{
+  font-family:var(--mono);font-size:0.74rem;
+  background:var(--paper2);border:1px solid var(--faint);
+  padding:7px 11px;color:var(--ink);outline:none;
+  transition:border-color 0.15s;width:220px;
+}
+.tbl-search:focus{border-color:var(--blue)}
+.tbl-search::placeholder{color:var(--dim);font-style:italic}
+.tbl-fmt-sel{
+  font-family:var(--mono);font-size:0.72rem;
+  background:var(--paper2);border:1px solid var(--faint);
+  padding:7px 10px;color:var(--ink3);outline:none;cursor:pointer;
+  transition:border-color 0.15s;
+}
+.tbl-fmt-sel:focus{border-color:var(--blue)}
+.tbl-count{
+  font-family:var(--mono);font-size:0.66rem;color:var(--dim);
+  margin-left:auto;font-style:italic;
+}
+.cit-table-wrap{
+  border:1px solid var(--faint);
+  overflow-x:auto;
+  margin-bottom:14px;
+}
+.cit-table{
+  width:100%;border-collapse:collapse;
+  font-family:var(--mono);font-size:0.73rem;
+}
+.cit-table thead th{
+  background:var(--ink);color:var(--paper);
+  padding:9px 12px;text-align:left;
+  font-family:var(--mono);font-size:0.62rem;font-weight:600;
+  letter-spacing:0.1em;text-transform:uppercase;
+  white-space:nowrap;cursor:pointer;
+  user-select:none;border-right:1px solid rgba(247,242,232,0.08);
+  transition:background 0.12s;
+}
+.cit-table thead th:hover{background:var(--ink2)}
+.cit-table thead th:last-child{border-right:none}
+.cit-table thead th.sort-asc::after{content:' ↑';color:var(--faint);font-size:0.6rem}
+.cit-table thead th.sort-desc::after{content:' ↓';color:var(--faint);font-size:0.6rem}
+.cit-table tbody tr{
+  border-bottom:1px solid var(--faint);
+  transition:background 0.1s;cursor:pointer;
+}
+.cit-table tbody tr:last-child{border-bottom:none}
+.cit-table tbody tr:hover{background:var(--paper2)}
+.cit-table tbody tr.expanded{background:var(--paper2)}
+.cit-table tbody td{
+  padding:9px 12px;vertical-align:top;
+  color:var(--ink2);
+}
+.td-num{
+  color:var(--blue);font-weight:600;
+  width:36px;text-align:center;
+  border-right:1px solid var(--faint);
+}
+.td-title{
+  font-family:var(--serif);font-style:italic;
+  font-size:0.82rem;font-weight:500;color:var(--ink);
+  max-width:280px;line-height:1.4;
+}
+.td-authors{color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-journal{color:var(--blue);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-year{color:var(--ink3);width:48px;text-align:center}
+.td-pmid{color:var(--muted);width:80px}
+.td-actions{width:60px;white-space:nowrap}
+
+/* expanded citation row */
+.cit-expand-row{display:none}
+.cit-expand-row.open{display:table-row}
+.cit-expand-cell{
+  padding:0 !important;
+  border-bottom:2px solid var(--blue) !important;
+}
+.cit-expand-inner{
+  background:var(--paper);
+  padding:14px 16px;
+}
+.expand-fmt-tabs{
+  display:flex;border-bottom:1px solid var(--faint);
+  margin-bottom:12px;gap:0;overflow-x:auto;
+  scrollbar-width:none;
+}
+.expand-fmt-tabs::-webkit-scrollbar{display:none}
+.expand-tab{
+  font-family:var(--mono);font-size:0.62rem;font-weight:500;
+  padding:6px 10px;border:none;background:none;
+  color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  white-space:nowrap;transition:all 0.12s;letter-spacing:0.04em;
+}
+.expand-tab:hover{color:var(--ink3)}
+.expand-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.expand-cit-wrap{position:relative}
+.expand-cit-text{
+  font-family:var(--mono);font-size:0.75rem;line-height:1.85;
+  color:var(--ink2);white-space:pre-wrap;word-break:break-word;
+  border-left:2px solid var(--blue);padding-left:14px;
+  margin-right:52px;
+}
+.expand-copy{
+  position:absolute;top:0;right:0;
+  font-family:var(--mono);font-size:0.62rem;
+  padding:3px 9px;border:1px solid var(--faint2);
+  background:var(--paper2);color:var(--muted);
+  cursor:pointer;transition:all 0.12s;
+}
+.expand-copy:hover{border-color:var(--blue);color:var(--blue)}
+.expand-copy.copied{border-color:#3a6b3a;color:#3a6b3a}
+.expand-links{
+  display:flex;gap:12px;margin-top:10px;padding-top:8px;
+  border-top:1px solid var(--faint);
+}
+.expand-link{
+  font-family:var(--mono);font-size:0.62rem;color:var(--blue);
+  text-decoration:none;transition:color 0.12s;
+}
+.expand-link:hover{color:var(--blue2);text-decoration:underline}
+.expand-abs-toggle{
+  font-family:var(--mono);font-size:0.62rem;color:var(--muted);
+  background:none;border:none;cursor:pointer;font-style:italic;
+  transition:color 0.12s;
+}
+.expand-abs-toggle:hover{color:var(--blue)}
+.expand-abs{
+  font-family:var(--serif);font-style:italic;font-size:0.76rem;
+  color:var(--muted);line-height:1.7;margin-top:8px;
+  border-left:1px solid var(--faint2);padding-left:12px;display:none;
+}
+.expand-abs.open{display:block}
+
+/* action buttons inside table */
+.row-expand-btn{
+  font-family:var(--mono);font-size:0.62rem;
+  padding:3px 8px;border:1px solid var(--faint);
+  background:var(--paper2);color:var(--muted);
+  cursor:pointer;transition:all 0.12s;white-space:nowrap;
+}
+.row-expand-btn:hover{border-color:var(--blue);color:var(--blue)}
+.row-expand-btn.open{background:var(--blue);color:var(--paper);border-color:var(--blue)}
+
+/* pagination */
+.pagination{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:0.7rem;color:var(--muted);
+}
+.pg-btn{
+  padding:4px 9px;border:1px solid var(--faint);
+  background:var(--paper2);color:var(--muted);cursor:pointer;
+  transition:all 0.12s;font-family:var(--mono);font-size:0.68rem;
+}
+.pg-btn:hover{border-color:var(--faint2);color:var(--ink3)}
+.pg-btn:disabled{opacity:0.35;cursor:not-allowed}
+.pg-info{font-family:var(--mono);font-size:0.66rem;color:var(--dim)}
+.pg-size{
+  font-family:var(--mono);font-size:0.68rem;
+  background:var(--paper2);border:1px solid var(--faint);
+  padding:4px 8px;color:var(--ink3);outline:none;cursor:pointer;
+  margin-left:auto;
+}
+
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="logo-wrap">
+    <div class="logo-mark">¶</div>
+    <div class="logo-name">CiteGen</div>
+  </div>
+  <div class="logo-rule"></div>
+  <div class="logo-caption">PMID · 9 FORMATS · MENDELEY EXPORT</div>
+</header>
+
+<div class="app-layout">
+
+  <!-- ══════ SIDEBAR ══════ -->
+  <aside class="sidebar">
+
+    <div class="sb-section">
+      <div class="sb-label">PubMed IDs</div>
+      <textarea id="pmid-input" placeholder="37743532&#10;36517597&#10;35430011&#10;&#10;One per line, or comma / space separated"></textarea>
+      <div class="input-foot">
+        <span class="foot-hint">PMIDs are numeric — e.g. 37743532</span>
+        <span class="ink-link" onclick="loadExample()">load example</span>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Upload file</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-upload" accept=".txt,.csv"/>
+        <div class="upload-main">Drop .txt or click to browse</div>
+        <div class="upload-sub">One PMID per line · comma or space separated</div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Default display format</div>
+      <div class="fmt-grid">
+        <button class="fmt-pill active" data-fmt="apa">APA 7</button>
+        <button class="fmt-pill" data-fmt="vancouver">Vancouver</button>
+        <button class="fmt-pill" data-fmt="nature">Nature</button>
+        <button class="fmt-pill" data-fmt="harvard">Harvard</button>
+        <button class="fmt-pill" data-fmt="mla">MLA 9</button>
+        <button class="fmt-pill" data-fmt="chicago">Chicago</button>
+        <button class="fmt-pill" data-fmt="ieee">IEEE</button>
+        <button class="fmt-pill" data-fmt="nlm">NLM</button>
+        <button class="fmt-pill" data-fmt="ama">AMA</button>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">NCBI API key <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--dim)">optional · faster</span></div>
+      <div class="api-row">
+        <input type="password" class="api-inp" id="api-key" placeholder="ncbi.nlm.nih.gov/account"/>
+        <button class="api-save" onclick="saveKey()">Save</button>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <button class="run-btn" id="run-btn" onclick="runFetch()">Fetch citations</button>
+      <div class="status" id="status-el">Ready — paste PMIDs above</div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Export all</div>
+      <div class="exp-list">
+        <div class="exp-item" onclick="exportTXT()">
+          <span class="exp-ext ext-txt">.txt</span>
+          <div><div class="exp-label">Formatted citations</div><div class="exp-sub">current format · numbered</div></div>
+        </div>
+        <div class="exp-item" onclick="exportBIB()">
+          <span class="exp-ext ext-bib">.bib</span>
+          <div><div class="exp-label">BibTeX</div><div class="exp-sub">LaTeX · Mendeley · Zotero</div></div>
+        </div>
+        <div class="exp-item" onclick="exportRIS()">
+          <span class="exp-ext ext-ris">.ris</span>
+          <div><div class="exp-label">RIS format</div><div class="exp-sub">Mendeley · EndNote · Word plugin</div></div>
+        </div>
+        <div class="exp-item" onclick="exportXML()">
+          <span class="exp-ext ext-xml">.xml</span>
+          <div><div class="exp-label">PubMed XML</div><div class="exp-sub">native Mendeley import · full metadata</div></div>
+        </div>
+        <div class="exp-item" onclick="exportAllFormats()">
+          <span class="exp-ext ext-all">.txt</span>
+          <div><div class="exp-label">All 9 formats</div><div class="exp-sub">every style in one file</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="mendeley-note">
+        <strong>Mendeley:</strong> Download .ris or .xml →
+        Reference Manager → <strong>Add → Import Library</strong> → select file.
+        Use .xml for most complete metadata including abstracts and keywords.
+      </div>
+    </div>
+
+    <div class="about-block">
+      <div class="sb-label" style="margin-bottom:10px">About</div>
+      <p class="about-text">
+        CiteGen resolves PubMed IDs into formatted citations using the NCBI E-utilities API — the same infrastructure PubMed itself uses. No account, no install, no data ever leaves your browser. Built for researchers who need references fast, in the right format, and ready for their reference manager.
+      </p>
+      <div class="creator-row">
+        <span class="creator-label">Created by</span>
+        <a class="creator-link" href="https://chakitarora.github.io" target="_blank">Chakit Arora</a>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ══════ RESULTS ══════ -->
+  <main class="results-pane" id="results-pane">
+
+    <div id="empty-state" class="empty">
+      <div class="empty-mark">¶</div>
+      <div class="empty-title">No citations yet</div>
+      <div class="empty-body">
+        Paste PubMed IDs in the panel and click Fetch citations.<br/><br/>
+        Each PMID resolves to a full citation in all 9 formats simultaneously, plus export files ready for Mendeley, Zotero, and LaTeX.
+      </div>
+    </div>
+
+    <div id="results-section" style="display:none">
+      <div class="results-header">
+        <div>
+          <div class="results-count" id="results-count">—</div>
+          <div class="results-sub" id="results-sub">fetching…</div>
+        </div>
+      </div>
+
+      <div id="progress-section" class="progress-wrap" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+        <div class="chip-grid" id="chip-grid"></div>
+      </div>
+
+      <!-- TABLE TOOLBAR -->
+      <div class="tbl-toolbar" id="tbl-toolbar" style="display:none">
+        <input type="text" class="tbl-search" id="tbl-search" placeholder="Search title, author, journal…" oninput="applyTableFilters()"/>
+        <select class="tbl-fmt-sel" id="tbl-fmt-sel" onchange="updateTableFormat()">
+          <option value="apa">APA 7th</option>
+          <option value="vancouver">Vancouver</option>
+          <option value="nature">Nature</option>
+          <option value="harvard">Harvard</option>
+          <option value="mla">MLA 9th</option>
+          <option value="chicago">Chicago 17</option>
+          <option value="ieee">IEEE</option>
+          <option value="nlm">NLM</option>
+          <option value="ama">AMA</option>
+        </select>
+        <span class="tbl-count" id="tbl-count"></span>
+      </div>
+
+      <!-- TABLE -->
+      <div class="cit-table-wrap" id="cit-table-wrap" style="display:none">
+        <table class="cit-table" id="cit-table">
+          <thead>
+            <tr>
+              <th class="td-num" onclick="sortTable('idx')">#</th>
+              <th onclick="sortTable('title')">Title</th>
+              <th onclick="sortTable('authors')">Authors</th>
+              <th onclick="sortTable('journal')">Journal</th>
+              <th onclick="sortTable('year')">Year</th>
+              <th onclick="sortTable('pmid')">PMID</th>
+              <th>Expand</th>
+            </tr>
+          </thead>
+          <tbody id="cit-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="pagination" id="pagination" style="display:none">
+        <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">← Prev</button>
+        <span class="pg-info" id="pg-info"></span>
+        <button class="pg-btn" id="pg-next" onclick="changePage(1)">Next →</button>
+        <select class="pg-size" id="pg-size" onchange="changePageSize()">
+          <option value="10">10 / page</option>
+          <option value="25" selected>25 / page</option>
+          <option value="50">50 / page</option>
+          <option value="100">100 / page</option>
+        </select>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="footer-disclaimer">
+    CiteGen retrieves metadata from the NCBI PubMed database via the E-utilities API. Citation formatting follows published style guide specifications but should be verified against the target journal's author instructions before submission. This tool is provided for research convenience and is not affiliated with NCBI, NLM, or any publisher. All data processing occurs in your browser; no information is transmitted to or stored by this tool.
+  </div>
+  <div class="footer-creator">
+    <div>Built by <a href="https://chakitarora.github.io" target="_blank">Chakit Arora</a></div>
+    <div style="color:rgba(247,242,232,0.3);font-size:0.58rem;margin-top:2px">Post-Doctoral Fellow · BIO@SNS, Pisa</div>
+  </div>
+  <div class="footer-design-note">
+    Design inspired by the ink-on-paper scientific illustrations of Santiago Ramón y Cajal (1852–1934), whose hand-drawn maps of the nervous system remain among the most precise and beautiful scientific documents ever made.
+  </div>
+</footer>
+
+<script>
+// ════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════
+let papers=[], activeFmt='apa', apiKey='';
+const FMTS=['apa','vancouver','nature','harvard','mla','chicago','ieee','nlm','ama'];
+const FMT_LABELS={apa:'APA 7th',vancouver:'Vancouver',nature:'Nature',harvard:'Harvard',mla:'MLA 9th',chicago:'Chicago 17',ieee:'IEEE',nlm:'NLM',ama:'AMA'};
+
+// ════════════════════════════════════════════════════
+// FORMAT PILLS
+// ════════════════════════════════════════════════════
+document.querySelectorAll('.fmt-pill').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.fmt-pill').forEach(x=>{x.classList.remove('active');});
+    b.classList.add('active');
+    activeFmt=b.dataset.fmt;
+    tableFmt=activeFmt;
+    if(document.getElementById('tbl-fmt-sel')) document.getElementById('tbl-fmt-sel').value=activeFmt;
+    if(papers.length>0) renderPage();
+  });
+});
+
+// ════════════════════════════════════════════════════
+// UPLOAD
+// ════════════════════════════════════════════════════
+const uz=document.getElementById('upload-zone');
+uz.addEventListener('dragover',e=>{e.preventDefault();uz.classList.add('dragover');});
+uz.addEventListener('dragleave',()=>uz.classList.remove('dragover'));
+uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('dragover');if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
+document.getElementById('file-upload').addEventListener('change',e=>{if(e.target.files[0])readFile(e.target.files[0]);});
+function readFile(f){const r=new FileReader();r.onload=e=>{const ex=document.getElementById('pmid-input').value.trim();document.getElementById('pmid-input').value=(ex?ex+'\n':'')+e.target.result;uz.querySelector('.upload-main').textContent='✓ '+f.name;uz.style.borderColor='#3a6b3a';};r.readAsText(f);}
+function saveKey(){apiKey=document.getElementById('api-key').value.trim();if(apiKey)document.getElementById('api-key').style.borderColor='#3a6b3a';}
+function loadExample(){document.getElementById('pmid-input').value='37743532\n36517597\n35430011\n34519806\n33547691';setStatus('Example PMIDs loaded — click Fetch citations','');}
+
+// ════════════════════════════════════════════════════
+// PARSE PMIDs
+// ════════════════════════════════════════════════════
+function parsePMIDs(text){
+  const raw=text.split(/[\s,;\n\r]+/).map(s=>s.trim()).filter(Boolean);
+  const valid=[],invalid=[];
+  raw.forEach(s=>{const c=s.replace(/^PMID:?\s*/i,'');if(/^\d{1,8}$/.test(c))valid.push(c);else if(s)invalid.push(s);});
+  return{valid:[...new Set(valid)],invalid};
+}
+
+// ════════════════════════════════════════════════════
+// RATE LIMITER
+// ════════════════════════════════════════════════════
+class RateLimiter{constructor(rps){this.d=1000/rps;this.t=0;}async wait(){const n=Date.now(),w=Math.max(0,this.t+this.d-n);if(w>0)await new Promise(r=>setTimeout(r,w));this.t=Date.now();}}
+
+// ════════════════════════════════════════════════════
+// FETCH + PARSE
+// ════════════════════════════════════════════════════
+async function fetchPaper(pmid,lim){
+  await lim.wait();
+  const k=apiKey?`&api_key=${apiKey}`:'';
+  try{const r=await fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&rettype=xml&retmode=xml${k}`);if(!r.ok)return null;return parseXML(await r.text(),pmid);}
+  catch(e){return null;}
+}
+
+function parseXML(xml,pmid){
+  const doc=new DOMParser().parseFromString(xml,'text/xml');
+  const art=doc.querySelector('PubmedArticle');if(!art)return null;
+  const authors=[];
+  art.querySelectorAll('Author').forEach(a=>{const last=a.querySelector('LastName')?.textContent||'';const fore=a.querySelector('ForeName')?.textContent||'';const init=a.querySelector('Initials')?.textContent||'';const coll=a.querySelector('CollectiveName')?.textContent||'';if(coll)authors.push({last:coll,fore:'',initials:'',collective:true});else if(last)authors.push({last,fore,initials:init,collective:false});});
+  const title=(art.querySelector('ArticleTitle')?.textContent||'').replace(/\.$/,'');
+  const journal=art.querySelector('Title')?.textContent||'';
+  const isoAbbrev=art.querySelector('ISOAbbreviation')?.textContent||journal;
+  const year=art.querySelector('PubDate Year')?.textContent||art.querySelector('MedlineDate')?.textContent?.substring(0,4)||'';
+  const volume=art.querySelector('Volume')?.textContent||'';
+  const issue=art.querySelector('Issue')?.textContent||'';
+  const medlinePg=art.querySelector('MedlinePgn')?.textContent||'';
+  const sp=art.querySelector('StartPage')?.textContent||'';
+  const ep=art.querySelector('EndPage')?.textContent||'';
+  const pages=medlinePg||(sp&&ep?`${sp}-${ep}`:sp)||'';
+  const abstract=art.querySelector('AbstractText')?.textContent||'';
+  const pmidNode=art.querySelector('PMID')?.textContent||pmid;
+  let doi='';
+  art.querySelectorAll('ArticleId,ELocationID').forEach(el=>{if((el.getAttribute('IdType')||el.getAttribute('EIdType'))==='doi'&&!doi)doi=el.textContent;});
+  const issn=art.querySelector('ISSN')?.textContent||'';
+  const keywords=[],mesh=[];
+  art.querySelectorAll('Keyword').forEach(k=>keywords.push(k.textContent));
+  art.querySelectorAll('DescriptorName').forEach(m=>mesh.push(m.textContent));
+  return{pmid:pmidNode,title,authors,journal,isoAbbrev,year,volume,issue,pages,abstract,doi,issn,keywords,mesh};
+}
+
+// ════════════════════════════════════════════════════
+// FORMATTERS
+// ════════════════════════════════════════════════════
+function auAPA(aa){if(!aa.length)return'';const f=a=>a.collective?a.last:`${a.last}, ${a.initials.split('').join('. ')}.`;if(aa.length<=20)return aa.map(f).join(', ');return aa.slice(0,19).map(f).join(', ')+', ...'+f(aa[aa.length-1]);}
+function auVAN(aa){if(!aa.length)return'';const f=a=>a.collective?a.last:`${a.last} ${a.initials}`;if(aa.length<=6)return aa.map(f).join(', ');return aa.slice(0,6).map(f).join(', ')+', et al';}
+function auNAT(aa){if(!aa.length)return'';const f=a=>a.collective?a.last:`${a.fore.split(' ').map(n=>n[0]+'.').join(' ')} ${a.last}`;if(aa.length<=5)return aa.map(f).join(', ');return aa.slice(0,5).map(f).join(', ')+' et al.';}
+function auHAR(aa){if(!aa.length)return'';const f=a=>a.collective?a.last:`${a.last}, ${a.initials.split('').join('.')+'.'}`;if(aa.length===1)return f(aa[0]);if(aa.length<=3)return aa.map(f).join(' and ');return f(aa[0])+' et al.';}
+function auMLA(aa){if(!aa.length)return'';if(aa[0].collective)return aa[0].last;const fi=`${aa[0].last}, ${aa[0].fore}`;if(aa.length===1)return fi;if(aa.length===2)return`${fi}, and ${aa[1].fore} ${aa[1].last}`;return fi+', et al';}
+function auCHI(aa){if(!aa.length)return'';const f=(a,i)=>i===0?a.collective?a.last:`${a.last}, ${a.fore}`:`${a.fore} ${a.last}`;if(aa.length<=3)return aa.map(f).join(', ');return f(aa[0],0)+', et al.';}
+function auIEEE(aa){if(!aa.length)return'';const f=a=>a.collective?a.last:`${a.initials.split('').join('. ')}. ${a.last}`;if(aa.length<=6)return aa.map(f).join(', ');return aa.slice(0,6).map(f).join(', ')+' et al.';}
+function auAMA(aa){if(!aa.length)return'';const f=a=>a.collective?a.last:`${a.last} ${a.initials}`;if(aa.length<=6)return aa.map(f).join(', ');return aa.slice(0,6).map(f).join(', ')+', et al';}
+
+function cite_apa(p){const a=auAPA(p.authors);const doi=p.doi?`https://doi.org/${p.doi}`:`https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/`;const vol=p.volume?`, ${p.volume}`:'';const iss=p.issue?`(${p.issue})`:'';const pg=p.pages?`, ${p.pages}`:'';return`${a} (${p.year||'n.d.'}). ${p.title}. ${p.journal}${vol}${iss}${pg}. ${doi}`;}
+function cite_vancouver(p){const a=auVAN(p.authors);const vol=p.volume?`;${p.volume}`:'';const iss=p.issue?`(${p.issue})`:'';const pg=p.pages?`:${p.pages}`:'';const doi=p.doi?` doi:${p.doi}`:'';return`${a}. ${p.title}. ${p.isoAbbrev||p.journal}. ${p.year}${vol}${iss}${pg}.${doi} PubMed PMID: ${p.pmid}.`;}
+function cite_nature(p){const a=auNAT(p.authors);const vol=p.volume?` ${p.volume},`:'';const pg=p.pages?` ${p.pages}`:'';return`${a} ${p.title}. ${p.isoAbbrev||p.journal}${vol}${pg} (${p.year}).${p.doi?' https://doi.org/'+p.doi:''}`;}
+function cite_harvard(p){const a=auHAR(p.authors);const vol=p.volume?`, vol. ${p.volume}`:'';const iss=p.issue?`, no. ${p.issue}`:'';const pg=p.pages?`, pp. ${p.pages}`:'';return`${a} (${p.year}) '${p.title}', ${p.journal}${vol}${iss}${pg}.${p.doi?' Available at: https://doi.org/'+p.doi:' PMID: '+p.pmid}.`;}
+function cite_mla(p){const a=auMLA(p.authors);const vol=p.volume?`, vol. ${p.volume}`:'';const iss=p.issue?`, no. ${p.issue}`:'';const pg=p.pages?`, pp. ${p.pages}`:'';const doi=p.doi?`https://doi.org/${p.doi}.`:`PubMed, PMID ${p.pmid}.`;return`${a}. "${p.title}." ${p.journal}${vol}${iss}, ${p.year}${pg}. ${doi}`;}
+function cite_chicago(p){const a=auCHI(p.authors);const vol=p.volume?` ${p.volume}`:'';const iss=p.issue?`, no. ${p.issue}`:'';const pg=p.pages?` (${p.year}): ${p.pages}`:`(${p.year})`;const doi=p.doi?` https://doi.org/${p.doi}.`:'';return`${a}. "${p.title}." ${p.journal}${vol}${iss} ${pg}.${doi}`;}
+function cite_ieee(p){const a=auIEEE(p.authors);const vol=p.volume?`, vol. ${p.volume}`:'';const iss=p.issue?`, no. ${p.issue}`:'';const pg=p.pages?`, pp. ${p.pages}`:'';const doi=p.doi?`, doi: ${p.doi}`:'';return`${a}, "${p.title}," ${p.journal}${vol}${iss}${pg}, ${p.year}${doi}.`;}
+function cite_nlm(p){const a=auVAN(p.authors);const vol=p.volume?`;${p.volume}`:'';const iss=p.issue?`(${p.issue})`:'';const pg=p.pages?`:${p.pages}`:'';return`${a}. ${p.title}. ${p.isoAbbrev||p.journal}. ${p.year}${vol}${iss}${pg}. PubMed PMID: ${p.pmid}.${p.doi?' DOI: '+p.doi:''}`;}
+function cite_ama(p){const a=auAMA(p.authors);const vol=p.volume?`. ${p.volume}`:'';const iss=p.issue?`(${p.issue})`:'';const pg=p.pages?`:${p.pages}`:'';const doi=p.doi?` doi:${p.doi}`:'';return`${a}. ${p.title}. ${p.isoAbbrev||p.journal}.${vol}${iss}${pg}. Published ${p.year}.${doi}`;}
+const FMTERS={apa:cite_apa,vancouver:cite_vancouver,nature:cite_nature,harvard:cite_harvard,mla:cite_mla,chicago:cite_chicago,ieee:cite_ieee,nlm:cite_nlm,ama:cite_ama};
+
+// ════════════════════════════════════════════════════
+// BIBTEX / RIS / XML
+// ════════════════════════════════════════════════════
+function toBIB(p){const key=(p.authors[0]?.last||'Unknown').replace(/[^a-zA-Z]/g,'')+p.year+(p.title.split(' ')[0]||'').replace(/[^a-zA-Z]/g,'');const au=p.authors.map(a=>a.collective?a.last:`${a.last}, ${a.fore}`).join(' and ');const pg=p.pages.replace('-','--');return`@article{${key.substring(0,24)},\n  author    = {${au}},\n  title     = {{${p.title}}},\n  journal   = {${p.journal}},\n  year      = {${p.year}},\n  volume    = {${p.volume}},\n  number    = {${p.issue}},\n  pages     = {${pg}},\n  pmid      = {${p.pmid}},${p.doi?'\n  doi       = {'+p.doi+'},':''}\n}`;}
+function toRIS(p){let r=`TY  - JOUR\n`;p.authors.forEach(a=>{r+=`AU  - ${a.collective?a.last:a.last+', '+a.fore}\n`;});r+=`TI  - ${p.title}\nJO  - ${p.journal}\nJA  - ${p.isoAbbrev||p.journal}\nPY  - ${p.year}\n`;if(p.volume)r+=`VL  - ${p.volume}\n`;if(p.issue)r+=`IS  - ${p.issue}\n`;if(p.pages){const pts=p.pages.split(/[-–]/);r+=`SP  - ${pts[0]||''}\n`;if(pts[1])r+=`EP  - ${pts[1]}\n`;}if(p.doi)r+=`DO  - ${p.doi}\n`;r+=`AN  - ${p.pmid}\nUR  - https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/\n`;if(p.abstract)r+=`AB  - ${p.abstract.substring(0,1000)}\n`;p.keywords.forEach(k=>{r+=`KW  - ${k}\n`;});if(p.issn)r+=`SN  - ${p.issn}\n`;r+=`ER  - \n`;return r;}
+function ex(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function buildXML(){const arts=papers.map(p=>{const auX=p.authors.map(a=>a.collective?`<Author ValidYN="Y"><CollectiveName>${ex(a.last)}</CollectiveName></Author>`:`<Author ValidYN="Y"><LastName>${ex(a.last)}</LastName><ForeName>${ex(a.fore)}</ForeName><Initials>${ex(a.initials)}</Initials></Author>`).join('\n          ');const doiEl=p.doi?`\n      <ArticleId IdType="doi">${ex(p.doi)}</ArticleId>`:'';return`  <PubmedArticle>\n    <MedlineCitation Status="MEDLINE">\n      <PMID Version="1">${p.pmid}</PMID>\n      <Article PubModel="Print">\n        <Journal>\n          <ISSN IssnType="Print">${ex(p.issn)}</ISSN>\n          <JournalIssue CitedMedium="Print">\n            <Volume>${ex(p.volume)}</Volume>\n            <Issue>${ex(p.issue)}</Issue>\n            <PubDate><Year>${ex(p.year)}</Year></PubDate>\n          </JournalIssue>\n          <Title>${ex(p.journal)}</Title>\n          <ISOAbbreviation>${ex(p.isoAbbrev)}</ISOAbbreviation>\n        </Journal>\n        <ArticleTitle>${ex(p.title)}</ArticleTitle>\n        <Pagination><MedlinePgn>${ex(p.pages)}</MedlinePgn></Pagination>\n        <Abstract><AbstractText>${ex(p.abstract.substring(0,2000))}</AbstractText></Abstract>\n        <AuthorList CompleteYN="Y">\n          ${auX}\n        </AuthorList>\n      </Article>\n    </MedlineCitation>\n    <PubmedData>\n      <ArticleIdList>\n        <ArticleId IdType="pubmed">${p.pmid}</ArticleId>${doiEl}\n      </ArticleIdList>\n    </PubmedData>\n  </PubmedArticle>`;}).join('\n');return`<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2024//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_240101.dtd">\n<PubmedArticleSet>\n${arts}\n</PubmedArticleSet>`;}
+
+// ════════════════════════════════════════════════════
+// MAIN RUN
+// ════════════════════════════════════════════════════
+async function runFetch(){
+  const text=document.getElementById('pmid-input').value.trim();
+  if(!text){alert('Please enter at least one PubMed ID.');return;}
+  const{valid,invalid}=parsePMIDs(text);
+  if(!valid.length){alert('No valid PubMed IDs found. PMIDs are 1–8 digit numbers (e.g. 37743532).');return;}
+  document.getElementById('run-btn').disabled=true;
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('results-section').style.display='block';
+  document.getElementById('cards-wrap').innerHTML='';
+  document.getElementById('progress-section').style.display='block';
+  papers=[];
+  document.getElementById('chip-grid').innerHTML=valid.map(id=>`<div class="pmid-chip loading" id="chip-${id}">${id}</div>`).join('');
+  document.getElementById('progress-fill').style.width='0%';
+  document.getElementById('results-count').textContent=`${valid.length} paper${valid.length!==1?'s':''}`;
+  document.getElementById('results-sub').textContent='fetching from PubMed…';
+  setStatus(`Fetching ${valid.length} papers…`,'');
+  const lim=new RateLimiter(apiKey?8:2.5);
+  let done=0;
+  await Promise.all(valid.map(async pmid=>{
+    const p=await fetchPaper(pmid,lim);done++;
+    const chip=document.getElementById(`chip-${pmid}`);
+    if(p){papers.push(p);if(chip){chip.classList.remove('loading');chip.classList.add('done');}}
+    else{if(chip){chip.classList.remove('loading');chip.classList.add('error');chip.title='Not found';}}
+    document.getElementById('progress-fill').style.width=(done/valid.length*100)+'%';
+    setStatus(`${done} / ${valid.length} fetched…`,'');
+  }));
+  papers.sort((a,b)=>valid.indexOf(a.pmid)-valid.indexOf(b.pmid));
+  renderTable();
+  document.getElementById('progress-section').style.display='none';
+  document.getElementById('results-count').textContent=`${papers.length} paper${papers.length!==1?'s':''}`;
+  document.getElementById('results-sub').textContent=`${invalid.length?invalid.length+' invalid IDs skipped · ':''}click any entry to expand all formats`;
+  setStatus(`✓ ${papers.length} citations ready`,'ok');
+  document.getElementById('run-btn').disabled=false;
+}
+
+// ════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════
+function eh(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ════════════════════════════════════════════════════
+// TABLE STATE
+// ════════════════════════════════════════════════════
+let filteredPapers=[], currentPage=0, pageSize=25;
+let sortCol='idx', sortDir=1;
+let expandedRows=new Set();
+let tableFmt='apa';
+
+// ════════════════════════════════════════════════════
+// RENDER TABLE
+// ════════════════════════════════════════════════════
+function renderTable(){
+  filteredPapers=[...papers];
+  tableFmt=activeFmt;
+  document.getElementById('tbl-fmt-sel').value=activeFmt;
+  document.getElementById('tbl-toolbar').style.display='flex';
+  document.getElementById('cit-table-wrap').style.display='block';
+  document.getElementById('pagination').style.display='flex';
+  expandedRows.clear();
+  applyTableFilters();
+}
+
+function applyTableFilters(){
+  const q=document.getElementById('tbl-search').value.toLowerCase().trim();
+  filteredPapers=papers.filter(p=>{
+    if(!q) return true;
+    const au=p.authors.map(a=>a.last).join(' ').toLowerCase();
+    return p.title.toLowerCase().includes(q)||
+           au.includes(q)||
+           p.journal.toLowerCase().includes(q)||
+           p.year.includes(q)||
+           p.pmid.includes(q);
+  });
+  // re-apply sort
+  applySort();
+  currentPage=0;
+  renderPage();
+}
+
+function applySort(){
+  filteredPapers.sort((a,b)=>{
+    let av,bv;
+    if(sortCol==='idx'){av=papers.indexOf(a);bv=papers.indexOf(b);}
+    else if(sortCol==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}
+    else if(sortCol==='authors'){av=(a.authors[0]?.last||'').toLowerCase();bv=(b.authors[0]?.last||'').toLowerCase();}
+    else if(sortCol==='journal'){av=a.journal.toLowerCase();bv=b.journal.toLowerCase();}
+    else if(sortCol==='year'){av=parseInt(a.year)||0;bv=parseInt(b.year)||0;}
+    else if(sortCol==='pmid'){av=parseInt(a.pmid)||0;bv=parseInt(b.pmid)||0;}
+    else return 0;
+    if(av<bv) return -1*sortDir;
+    if(av>bv) return 1*sortDir;
+    return 0;
+  });
+}
+
+function sortTable(col){
+  if(sortCol===col) sortDir*=-1;
+  else{sortCol=col;sortDir=1;}
+  // update header classes
+  document.querySelectorAll('.cit-table thead th').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+  });
+  const colMap={idx:0,title:1,authors:2,journal:3,year:4,pmid:5};
+  const thIdx=colMap[col];
+  if(thIdx!==undefined){
+    const ths=document.querySelectorAll('.cit-table thead th');
+    ths[thIdx]?.classList.add(sortDir===1?'sort-asc':'sort-desc');
+  }
+  applySort();
+  currentPage=0;
+  renderPage();
+}
+
+function renderPage(){
+  const total=filteredPapers.length;
+  const totalPages=Math.max(1,Math.ceil(total/pageSize));
+  currentPage=Math.min(currentPage,totalPages-1);
+  const start=currentPage*pageSize;
+  const slice=filteredPapers.slice(start,start+pageSize);
+
+  document.getElementById('tbl-count').textContent=`${total} of ${papers.length} paper${papers.length!==1?'s':''}`;
+  document.getElementById('pg-info').textContent=`Page ${currentPage+1} of ${totalPages}`;
+  document.getElementById('pg-prev').disabled=currentPage===0;
+  document.getElementById('pg-next').disabled=currentPage>=totalPages-1;
+
+  const tbody=document.getElementById('cit-tbody');
+  tbody.innerHTML='';
+
+  slice.forEach((p,i)=>{
+    const globalIdx=papers.indexOf(p)+1;
+    const au3=p.authors.slice(0,3).map(a=>a.last).join(', ')+(p.authors.length>3?' et al.':'');
+    const isOpen=expandedRows.has(p.pmid);
+
+    // main row
+    const tr=document.createElement('tr');
+    tr.id=`tr-${p.pmid}`;
+    if(isOpen) tr.classList.add('expanded');
+    tr.innerHTML=`
+      <td class="td-num">${globalIdx}</td>
+      <td class="td-title">${eh(p.title||'[unavailable]')}</td>
+      <td class="td-authors" title="${eh(p.authors.map(a=>a.last+' '+a.initials).join(', '))}">${eh(au3)}</td>
+      <td class="td-journal" title="${eh(p.journal)}">${eh(p.isoAbbrev||p.journal)}</td>
+      <td class="td-year">${p.year}</td>
+      <td class="td-pmid">${p.pmid}</td>
+      <td class="td-actions">
+        <button class="row-expand-btn${isOpen?' open':''}" id="expbtn-${p.pmid}" onclick="toggleExpand('${p.pmid}',this)">${isOpen?'▴ close':'▾ cite'}</button>
+      </td>`;
+    tbody.appendChild(tr);
+
+    // expand row
+    const extr=document.createElement('tr');
+    extr.id=`extr-${p.pmid}`;
+    extr.className='cit-expand-row'+(isOpen?' open':'');
+    const tabs=FMTS.map(f=>`<button class="expand-tab${f===tableFmt?' active':''}" data-fmt="${f}" onclick="switchExpandTab('${p.pmid}','${f}',this)">${FMT_LABELS[f]}</button>`).join('');
+    const citText=FMTERS[tableFmt](p);
+    const abs=p.abstract?`<button class="expand-abs-toggle" onclick="toggleExpandAbs('${p.pmid}')">▸ Abstract</button><div class="expand-abs" id="expabs-${p.pmid}">${eh(p.abstract)}</div>`:'';
+    extr.innerHTML=`<td class="cit-expand-cell" colspan="7">
+      <div class="cit-expand-inner">
+        <div class="expand-fmt-tabs">${tabs}</div>
+        <div class="expand-cit-wrap">
+          <div class="expand-cit-text" id="exptxt-${p.pmid}">${eh(citText)}</div>
+          <button class="expand-copy" onclick="copyExpand('${p.pmid}',this)">copy</button>
+        </div>
+        <div class="expand-links">
+          <a class="expand-link" href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank">PubMed ↗</a>
+          ${p.doi?`<a class="expand-link" href="https://doi.org/${p.doi}" target="_blank">Full text ↗</a>`:''}
+          <span class="expand-link" style="cursor:pointer" onclick="navigator.clipboard.writeText('${p.pmid}');this.textContent='copied!';setTimeout(()=>this.textContent='PMID ${p.pmid}',1500)">PMID ${p.pmid}</span>
+          ${abs?`<span style="margin-left:auto">${abs}</span>`:''}
+        </div>
+      </div>
+    </td>`;
+    tbody.appendChild(extr);
+  });
+}
+
+function toggleExpand(pmid,btn){
+  const extr=document.getElementById(`extr-${pmid}`);
+  const tr=document.getElementById(`tr-${pmid}`);
+  const isOpen=expandedRows.has(pmid);
+  if(isOpen){
+    expandedRows.delete(pmid);
+    extr.classList.remove('open');
+    tr.classList.remove('expanded');
+    btn.classList.remove('open');
+    btn.textContent='▾ cite';
+  } else {
+    expandedRows.add(pmid);
+    extr.classList.add('open');
+    tr.classList.add('expanded');
+    btn.classList.add('open');
+    btn.textContent='▴ close';
+  }
+}
+
+function switchExpandTab(pmid,fmt,btn){
+  const inner=btn.closest('.cit-expand-inner');
+  inner.querySelectorAll('.expand-tab').forEach(t=>t.classList.toggle('active',t.dataset.fmt===fmt));
+  const p=papers.find(x=>x.pmid===pmid);
+  if(p) document.getElementById(`exptxt-${pmid}`).textContent=FMTERS[fmt](p);
+}
+
+function copyExpand(pmid,btn){
+  const txt=document.getElementById(`exptxt-${pmid}`)?.textContent||'';
+  navigator.clipboard.writeText(txt).then(()=>{
+    btn.textContent='✓ copied';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='copy';btn.classList.remove('copied');},2000);
+  });
+}
+
+function toggleExpandAbs(pmid){
+  const el=document.getElementById(`expabs-${pmid}`);
+  const btn=el.previousElementSibling;
+  el.classList.toggle('open');
+  btn.textContent=el.classList.contains('open')?'▾ Abstract':'▸ Abstract';
+}
+
+function updateTableFormat(){
+  tableFmt=document.getElementById('tbl-fmt-sel').value;
+  activeFmt=tableFmt;
+  // update active pill in sidebar
+  document.querySelectorAll('.fmt-pill').forEach(b=>{b.classList.toggle('active',b.dataset.fmt===tableFmt);});
+  // re-render page to update expanded rows
+  renderPage();
+}
+
+function changePage(d){currentPage+=d;renderPage();}
+function changePageSize(){pageSize=parseInt(document.getElementById('pg-size').value);currentPage=0;renderPage();}
+
+function setStatus(m,t){const el=document.getElementById('status-el');el.textContent=m;el.className='status'+(t?' '+t:'');}
+
+function exportTXT(){if(!papers.length){alert('Fetch citations first.');return;}let out=`CiteGen — ${FMT_LABELS[activeFmt]}\nGenerated: ${new Date().toLocaleDateString()}\n${'─'.repeat(70)}\n\n`;papers.forEach((p,i)=>{out+=`[${i+1}] ${FMTERS[activeFmt](p)}\n\n`;});dl(new Blob([out],{type:'text/plain'}),`citations_${activeFmt}.txt`);}
+function exportBIB(){if(!papers.length){alert('Fetch citations first.');return;}const out='% CiteGen BibTeX export\n% Generated: '+new Date().toLocaleDateString()+'\n% Import: Mendeley (File → Import), Zotero, LaTeX\n\n'+papers.map(p=>toBIB(p)).join('\n\n');dl(new Blob([out],{type:'text/plain'}),'citations.bib');}
+function exportRIS(){if(!papers.length){alert('Fetch citations first.');return;}const out=`; CiteGen RIS export\n; Generated: ${new Date().toLocaleDateString()}\n; Import: Mendeley (Add → Import Library), EndNote\n\n`+papers.map(p=>toRIS(p)).join('\n');dl(new Blob([out],{type:'application/x-research-info-systems'}),'citations.ris');}
+function exportXML(){if(!papers.length){alert('Fetch citations first.');return;}dl(new Blob([buildXML()],{type:'application/xml'}),'citations_pubmed.xml');}
+function exportAllFormats(){if(!papers.length){alert('Fetch citations first.');return;}let out=`CiteGen — All 9 citation formats\nGenerated: ${new Date().toLocaleDateString()}\n${'═'.repeat(70)}\n`;papers.forEach((p,i)=>{out+=`\n${'═'.repeat(70)}\n[${i+1}] ${p.title}\n${p.authors.slice(0,3).map(a=>a.last).join(', ')} · ${p.journal} · ${p.year} · PMID ${p.pmid}\n${'─'.repeat(70)}\n`;FMTS.forEach(f=>{out+=`\n${FMT_LABELS[f]}:\n${FMTERS[f](p)}\n`;});});dl(new Blob([out],{type:'text/plain'}),'citations_all_formats.txt');}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+function setStatus(m,t){const el=document.getElementById('status-el');el.textContent=m;el.className='status'+(t?' '+t:'');}
+
+</script>
+</body>
+</html>
