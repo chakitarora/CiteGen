@@ -179,17 +179,6 @@ No data is sent to any server operated by this tool. Your PMIDs and the fetched 
 
 ---
 
-## Deploy your own instance
-
-**One file, five minutes, free forever.**
-
-1. Create a new public repository on GitHub (e.g. `citegen`)
-2. Upload `index.html` (rename `citegen.html` → `index.html`)
-3. Go to **Settings** → **Pages** → Branch: `main`, folder: `/` → **Save**
-4. Your instance is live at `https://yourusername.github.io/citegen`
-
----
-
 ## How it works
 
 CiteGen uses the NCBI E-utilities `efetch` endpoint with `rettype=xml` to retrieve full PubMed article records. The XML is parsed in the browser using the native `DOMParser` API — no libraries. Citation formatting is implemented as pure JavaScript functions, one per style, each following the official style guide specifications. All four export formats (TXT, BibTeX, RIS, PubMed XML) are generated from the parsed metadata and downloaded as files using the `Blob` + `URL.createObjectURL` browser API.
