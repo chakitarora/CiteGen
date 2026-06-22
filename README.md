@@ -10,7 +10,7 @@ No account. No install. No data leaves your browser. One HTML file.
 
 CiteGen is a browser-based citation tool for researchers. You give it a list of PubMed IDs (PMIDs) and it fetches the full metadata for each paper directly from NCBI, then formats every citation simultaneously in 9 major styles. You can copy any individual citation, or download your entire reference list in formats that work natively with Mendeley, Zotero, EndNote, LaTeX, and Microsoft Word.
 
-**Live tool:** `https://chakitarora.github.io/citegen`
+**Live tool:** `https://chakitarora.github.io/CiteGen`
 
 ---
 
